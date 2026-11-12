@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shared Calendar</title>
+<style>
+  :root{
+    --bg:#f4f5f9; --panel:#ffffff; --text:#1c2033; --muted:#7a8099; --line:#e6e8f0;
+    --accent:#4f6bff; --accent-soft:#e8ecff; --today:#fff6dd; --danger:#e5484d;
+    --shadow:0 1px 3px rgba(20,25,60,.08),0 8px 24px rgba(20,25,60,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1220; --panel:#181c2e; --text:#e8eaf5; --muted:#8d93b0; --line:#262b42;
+      --accent:#7c92ff; --accent-soft:#232a52; --today:#2c2a1a; --danger:#ff6b70;
+      --shadow:0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 24px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px}
+  .logo{width:32px;height:32px;border-radius:9px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:17px}
+  .sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#2fb344}
+  .dot.err{background:var(--danger)} .dot.busy{background:#f0a020}
+  main{display:grid;grid-template-columns:1fr 340px;gap:20px;padding:20px 24px;max-width:1400px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+  .cal{padding:18px}
+  .cal-head{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .cal-head h2{margin:0;font-size:22px;flex:1;min-width:150px}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:7px 12px;border-radius:9px}
+  button:hover{background:var(--accent-soft)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:hover{filter:brightness(1.08)}
+  .dow,.grid{display:grid;grid-template-columns:repeat(7,1fr)}
+  .dow div{text-align:center;font-size:12px;color:var(--muted);padding:6px 0;font-weight:600}
+  .grid{gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .cell{background:var(--panel);min-height:104px;padding:6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0}
+  .cell:hover{background:var(--accent-soft)}
+  .cell.other{opacity:.45}
+  .cell.today{background:var(--today)}
+  .cell.sel{outline:2px solid var(--accent);outline-offset:-2px}
+  .num{font-size:13px;font-weight:600;width:24px;height:24px;display:grid;place-items:center;border-radius:50%}
+  .today .num{background:var(--accent);color:#fff}
+  .chip{font-size:11.5px;padding:2px 6px;border-radius:6px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .more{font-size:11px;color:var(--muted);padding-left:4px}
+  aside{display:flex;flex-direction:column;gap:20px}
+  .panel{padding:18px}
+  .panel h3{margin:0 0 4px;font-size:16px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+  .ev{display:flex;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;align-items:flex-start}
+  .bar{width:5px;align-self:stretch;border-radius:3px;flex:none}
+  .ev .body{flex:1;min-width:0}
+  .ev .t{font-weight:600;word-break:break-word}
+  .ev .m{font-size:12px;color:var(--muted)}
+  .del{padding:2px 8px;color:var(--danger);border-color:transparent;background:transparent;font-size:18px;line-height:1}
+  .empty{color:var(--muted);font-size:14px;padding:8px 0}
+  form{display:grid;gap:8px;margin-top:12px}
+  input[type=text],input[type=time]{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--text);width:100%}
+  input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .row{display:grid;grid-template-columns:1fr 110px;gap:8px}
+  .swatches{display:flex;gap:6px;flex-wrap:wrap}
+  .sw{width:24px;height:24px;border-radius:50%;border:3px solid transparent;padding:0;cursor:pointer}
+  .sw.on{border-color:var(--text)}
+  .legend{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{display:flex;align-items:center;gap:6px;font-size:12.5px;padding:4px 10px;border-radius:99px;border:1px solid var(--line);cursor:pointer;user-select:none}
+  .tag.off{opacity:.4}
+  .tag i{width:9px;height:9px;border-radius:50%;display:block}
+  .up{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px;cursor:pointer}
+  .up:last-child{border:0}
+  .up b{width:62px;flex:none;color:var(--muted);font-weight:600}
+  #err{display:none;margin:16px 24px 0;padding:12px 16px;border-radius:10px;background:#fdecec;color:#8a1f24;font-size:13px}
+  #err pre{margin:8px 0 0;white-space:pre-wrap;font-size:12px;background:#fff;padding:8px;border-radius:6px;user-select:all}
+  @media(max-width:960px){main{grid-template-columns:1fr;padding:12px}.cell{min-height:72px}.chip{font-size:10px;padding:1px 4px}header{padding:12px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">📅</div>Shared Calendar</div>
+  <div class="sync"><span class="dot busy" id="dot"></span><span id="syncTxt">Connecting…</span></div>
+</header>
+<div id="err"></div>
+
+<main>
+  <section class="card cal">
+    <div class="cal-head">
+      <h2 id="title"></h2>
+      <button id="prev" aria-label="Previous month">‹</button>
+      <button id="today">Today</button>
+      <button id="next" aria-label="Next month">›</button>
+    </div>
+    <div class="dow"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <aside>
+    <section class="card panel">
+      <h3 id="dayTitle"></h3>
+      <div class="sub" id="daySub"></div>
+      <div id="dayList"></div>
+      <form id="form">
+        <div class="row">
+          <input type="text" id="person" placeholder="Your name" maxlength="30" required>
+          <input type="time" id="time" title="Optional time">
+        </div>
+        <input type="text" id="what" placeholder="What are you doing?" maxlength="100" required>
+        <div class="swatches" id="swatches"></div>
+        <button class="primary" type="submit">Add to this day</button>
+      </form>
+    </section>
+
+    <section class="card panel">
+      <h3>People</h3>
+      <div class="sub">Tap to show / hide</div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section class="card panel">
+      <h3>Coming up</h3>
+      <div class="sub">Next 30 days</div>
+      <div id="upcoming"></div>
+    </section>
+  </aside>
+</main>
+
+<script>
+const SB_URL = "https://ayeosprjfjbacuxwsjdg.supabase.co/rest/v1";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5ZW9zcHJqZmpiYWN1eHdzamRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0ODM4NjUsImV4cCI6MjExMDA1OTg2NX0.zYopUbo9EpSwlgo1eEAE7Fzii4bXXJw_kX4_rN2x6Rk";
+const TABLE = "calendar_events";
+const COLORS = ["#4f6bff","#e5484d","#2fb344","#f0a020","#9b59d0","#12a5b5","#e0569a","#6b7280"];
+const SETUP_SQL = `create table if not exists calendar_events (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz default now(),
+  event_date date not null,
+  event_time text,
+  person text not null,
+  title text not null,
+  color text default '#4f6bff'
+);
+alter table calendar_events enable row level security;
+create policy "public read"   on calendar_events for select using (true);
+create policy "public insert" on calendar_events for insert with check (true);
+create policy "public delete" on calendar_events for delete using (true);`;
+
+const H = {apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json"};
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
+const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let view = new Date(); view.setDate(1);
+let selected = ymd(new Date());
+let events = [];       // events within the visible grid
+let upcoming = [];
+let hidden = new Set();
+let color = COLORS[0];
+
+/* ---------- API ---------- */
+async function api(path, opts={}){
+  const r = await fetch(`${SB_URL}/${path}`, {...opts, headers:{...H, ...(opts.headers||{})}});
+  if(!r.ok){ const t = await r.text(); const e = new Error(t || r.statusText); e.status = r.status; throw e; }
+  return r.status === 204 ? null : r.json();
+}
+function setSync(state, txt){ $("dot").className = "dot "+state; $("syncTxt").textContent = txt; }
+function showErr(e){
+  const box = $("err");
+  const missing = /PGRST205|does not exist|schema cache/i.test(e.message) || e.status === 404;
+  const rls = /row-level security|42501/i.test(e.message);
+  box.style.display = "block";
+  box.innerHTML = missing || rls
+    ? `<b>Database isn't set up yet.</b> Open Supabase → SQL Editor, run this once, then refresh:<pre>${esc(SETUP_SQL)}</pre>`
+    : `<b>Couldn't reach the database.</b> ${esc(e.message).slice(0,300)}`;
+  setSync("err","Offline");
+}
+
+function gridRange(){
+  const first = new Date(view.getFullYear(), view.getMonth(), 1);
+  const start = new Date(first); start.setDate(1 - first.getDay());
+  const end = new Date(start); end.setDate(start.getDate()+41);
+  return [start, end];
+}
+
+async function load(){
+  const [s,e] = gridRange();
+  const t0 = ymd(new Date()), t1 = new Date(); t1.setDate(t1.getDate()+30);
+  try{
+    const [a,b] = await Promise.all([
+      api(`${TABLE}?select=*&event_date=gte.${ymd(s)}&event_date=lte.${ymd(e)}&order=event_date,event_time.nullsfirst,created_at`),
+      api(`${TABLE}?select=*&event_date=gte.${t0}&event_date=lte.${ymd(t1)}&order=event_date,event_time.nullsfirst&limit=12`)
+    ]);
+    events = a; upcoming = b;
+    $("err").style.display = "none";
+    setSync("", "Live · synced " + new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}));
+    render();
+  }catch(err){ showErr(err); }
+}
+
+/* ---------- Render ---------- */
+const visible = list => list.filter(ev => !hidden.has(ev.person.toLowerCase()));
+
+function render(){
+  renderGrid(); renderDay(); renderLegend(); renderUpcoming();
+}
+
+function renderGrid(){
+  $("title").textContent = view.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const [start] = gridRange();
+  const today = ymd(new Date());
+  const byDay = {};
+  visible(events).forEach(ev => (byDay[ev.event_date] ||= []).push(ev));
+  let html = "";
+  for(let i=0;i<42;i++){
+    const d = new Date(start); d.setDate(start.getDate()+i);
+    const k = ymd(d), list = byDay[k]||[];
+    const cls = ["cell", d.getMonth()!==view.getMonth()?"other":"", k===today?"today":"", k===selected?"sel":""].join(" ");
+    const chips = list.slice(0,3).map(ev=>`<div class="chip" style="background:${esc(ev.color||COLORS[0])}">${ev.event_time?esc(ev.event_time)+" ":""}${esc(ev.person)}: ${esc(ev.title)}</div>`).join("");
+    const more = list.length>3 ? `<div class="more">+${list.length-3} more</div>` : "";
+    html += `<div class="${cls}" data-d="${k}"><div class="num">${d.getDate()}</div>${chips}${more}</div>`;
+  }
+  $("grid").innerHTML = html;
+}
+
+function renderDay(){
+  const d = parse(selected);
+  $("dayTitle").textContent = d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+  const list = visible(events).filter(e=>e.event_date===selected);
+  $("daySub").textContent = list.length ? `${list.length} thing${list.length>1?"s":""} planned` : "Nothing planned yet";
+  $("dayList").innerHTML = list.length ? list.map(ev=>`
+    <div class="ev">
+      <div class="bar" style="background:${esc(ev.color||COLORS[0])}"></div>
+      <div class="body"><div class="t">${esc(ev.title)}</div>
+      <div class="m">${esc(ev.person)}${ev.event_time?" · "+esc(ev.event_time):""}</div></div>
+      <button class="del" data-id="${esc(ev.id)}" title="Remove">×</button>
+    </div>`).join("") : `<div class="empty">Be the first to add something 👇</div>`;
+}
+
+function renderLegend(){
+  const people = new Map();
+  [...events,...upcoming].forEach(e=>{ const k=e.person.toLowerCase(); if(!people.has(k)) people.set(k,{name:e.person,color:e.color}); });
+  $("legend").innerHTML = people.size ? [...people].map(([k,p])=>
+    `<div class="tag ${hidden.has(k)?"off":""}" data-p="${esc(k)}"><i style="background:${esc(p.color||COLORS[0])}"></i>${esc(p.name)}</div>`).join("")
+    : `<div class="empty">No one yet</div>`;
+}
+
+function renderUpcoming(){
+  const list = visible(upcoming).slice(0,8);
+  $("upcoming").innerHTML = list.length ? list.map(ev=>{
+    const d = parse(ev.event_date);
+    return `<div class="up" data-d="${ev.event_date}"><b>${d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}</b>
+      <span><span style="color:${esc(ev.color||COLORS[0])}">●</span> ${esc(ev.person)}: ${esc(ev.title)}</span></div>`;
+  }).join("") : `<div class="empty">Nothing coming up</div>`;
+}
+
+/* ---------- Actions ---------- */
+async function addEvent(e){
+  e.preventDefault();
+  const person = $("person").value.trim(), title = $("what").value.trim(), time = $("time").value || null;
+  if(!person || !title) return;
+  setSync("busy","Saving…");
+  try{
+    const [row] = await api(TABLE, {method:"POST", headers:{Prefer:"return=representation"},
+      body: JSON.stringify({event_date:selected, event_time:time, person, title, color})});
+    events.push(row);
+    $("what").value = ""; $("time").value = "";
+    await load();
+  }catch(err){ showErr(err); }
+}
+
+async function removeEvent(id){
+  const prev = events, prevUp = upcoming;
+  events = events.filter(e=>e.id!==id); upcoming = upcoming.filter(e=>e.id!==id);
+  render(); setSync("busy","Removing…");
+  try{ await api(`${TABLE}?id=eq.${encodeURIComponent(id)}`, {method:"DELETE"}); await load(); }
+  catch(err){ events = prev; upcoming = prevUp; render(); showErr(err); }
+}
+
+function go(delta){ view = new Date(view.getFullYear(), view.getMonth()+delta, 1); load(); renderGrid(); }
+
+/* ---------- Wiring ---------- */
+$("prev").onclick = () => go(-1);
+$("next").onclick = () => go(1);
+$("today").onclick = () => { const n=new Date(); view=new Date(n.getFullYear(),n.getMonth(),1); selected=ymd(n); load(); render(); };
+$("form").onsubmit = addEvent;
+$("grid").onclick = e => { const c = e.target.closest(".cell"); if(!c) return; selected = c.dataset.d; render(); };
+$("dayList").onclick = e => { const b = e.target.closest(".del"); if(b && confirm("Remove this entry?")) removeEvent(b.dataset.id); };
+$("legend").onclick = e => { const t = e.target.closest(".tag"); if(!t) return; const k=t.dataset.p; hidden.has(k)?hidden.delete(k):hidden.add(k); render(); };
+$("upcoming").onclick = e => { const u = e.target.closest(".up"); if(!u) return; selected=u.dataset.d; const d=parse(selected); view=new Date(d.getFullYear(),d.getMonth(),1); load(); render(); };
+
+$("swatches").innerHTML = COLORS.map((c,i)=>`<button type="button" class="sw ${i===0?"on":""}" style="background:${c}" data-c="${c}" aria-label="Color ${i+1}"></button>`).join("");
+$("swatches").onclick = e => { const b=e.target.closest(".sw"); if(!b) return; color=b.dataset.c; document.querySelectorAll(".sw").forEach(s=>s.classList.toggle("on",s===b)); };
+
+load();
+setInterval(()=>{ if(!document.hidden) load(); }, 8000);       // pick up other people's changes
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) load(); });
+</script>
+</body>
+</html>
